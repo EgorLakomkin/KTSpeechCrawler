@@ -1,0 +1,243 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>EMNLP demo. Automatic Dataset Construction for Speech Recognition from YouTube Videos</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+
+  <script src="//cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/2.0.5/wavesurfer.min.js"></script>
+  <!-- wavesurfer.js regions -->
+  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/wavesurfer.js/1.2.3/plugin/wavesurfer.regions.min.js"></script> -->
+
+  <script src="https://code.jquery.com/jquery-3.2.1.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+
+  <style>
+    /* change player background color */
+    #main {
+      margin: auto;
+      /*margin-left: 15px;
+      margin-top: 15px; */
+      width: 1000px;
+    }
+
+    #waveform {
+      max-width: 1000px;
+
+    }
+
+    #transcription {
+      margin-top: 15px;
+    }
+    .padded-multiline {
+      line-height: 1.3;
+      padding: 2px 0;
+      width: 800px;
+    }
+    .padded-multiline h3 {
+      padding: 4px 0;
+      display: inline;
+      margin: 0;
+    }
+    .padded-multiline h1 strong {
+      position: relative;
+    }
+
+
+    .grid-container {
+      margin-top: 25px;
+      display: grid;
+      grid-gap: 15px 15px;
+      grid-template-columns: auto auto auto auto;
+    }
+
+    .grid-item {
+      border-radius: 15px;
+      border: 2px solid #73AD21;
+      text-align:center;
+    }
+
+    .grid-item-active {
+      border-radius: 15px;
+      border: 2px solid #000000;
+      text-align:center;
+    }
+
+    .img_holder {
+      vertical-align:middle;
+      text-align:center
+    }
+
+
+
+  </style>
+
+</head>
+<body>
+
+
+  <nav class="navbar navbar-expand navbar-light bg-light">
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExample02" aria-controls="navbarsExample02" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarsExample02">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="#">Paper</a>
+          </li>
+          <li class="nav-item">
+            <a target="_blank" class="nav-link" href="https://github.com/EgorLakomkin/DatasetForASRfromYT">Code</a>
+          </li>
+          <li class="nav-item">
+            <a target="_blank" class="nav-link" href="http://secure-robots.eu/da/projects/6-prosodic-feature-recognition/">About</a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="#">Automatic Dataset Construction for Speech Recognition from YouTube Videos</a>
+          </li>
+
+        </ul>
+      </div>
+
+       <a class="navbar-brand" href="#">
+        <img src="/static/img/eu.png" width="90" height="50" alt="">
+      </a>
+      <a class="navbar-brand" href="#">
+        <img src="/static/img/uni-hamburg.png" width="120" height="40" alt="">
+      </a>
+    </nav>
+
+  <div id="main">
+    <div class="alert alert-dark" role="alert">
+      The goal of this project is to automatically prepare a dataset for speech recognition by crawling videos on YouTube and selecting the high quality samples.
+      Within a day it is possible to collect 150 hours of transcribed speech and 700 hours within a week (single core ).<br />
+     <!-- We demonstrated the usefulness of the collected samples via several experiments (see the paper). Here are some examples of samples automatically collected. -->
+    </div>
+      <div class="alert alert-primary" role="alert">
+      Listen the extracted samples by clicking 'Play' or click 'Next' to play the next (audio will start playing). To get more samples click on 'More samples' icon. Disclaimer: some utterances might contain obscene lexicon or disturbing material.
+    </div>
+    <div id="waveform"></div>
+
+
+    <button class="btn btn-dark" onclick="wavesurfer.playPause()">
+        <i class="glyphicon glyphicon-play"></i>
+        Play/Pause
+    </button>
+    <button class="btn btn-dark" id="btn_forward">
+        <i class="glyphicon glyphicon-forward"></i>
+        Next
+    </button>
+    <button class="btn btn-success" id="btn_correct">
+        <i class="glyphicon glyphicon-ok"></i>
+        Correct
+    </button>
+    <button class="btn btn-danger" id="btn_incorrect">
+        <i class="glyphicon glyphicon-remove"></i>
+        Not valid
+    </button>
+
+
+    <div id="transcription" class="padded-multiline"><h3><blockquote id="transcription-text">{{ samples['data'][0]['txt'] }}</blockquote></h3></div>
+
+    <div class="grid-container">
+
+      {% for sample in samples['data'] %}
+        <div class="grid-item"  data-index="{{ sample['index'] }}" data-wav="{{ sample['wav'] }}" data-txt="{{ sample['txt'] }}"><img  src="/static/img/1.png"/></div>
+
+      {% endfor %}
+
+    </div>
+      <div class="img_holder">More samples: <img onClick="window.location.reload()" style="height: 35px;width:35px;" src="/static/img/refresh.jpg"></div>
+    <div class="alert alert-dark" style="margin-top: 25px;" role="alert">
+        This project has received funding from the European Union's Horizon 2020 research and innovation programme under the Marie Sklodowska-Curie grant agreement No 642667 (<a target="_blank" href="http://secure-robots.eu/">SECURE</a>) and partial support from the German Research Foundation DFG under project CML (TRR 169).
+    </div>
+  </div>
+
+
+
+
+
+
+<script>
+
+
+var wavesurfer = WaveSurfer.create({
+  container: '#waveform',
+  waveColor: 'green',
+});
+current_index = 0;
+samples = {{ samples|tojson }};
+max_index = samples['data'].length - 1;
+
+wavesurfer.load("{{ url_for('static', filename = samples['data'][0]['wav']) }}");
+
+$("#btn_forward").click(function(){
+    current_index = current_index +1;
+    if (current_index > max_index)
+    {
+        window.location.reload();
+    }
+    else{
+        var next_wav = samples['data'][current_index]['wav'];
+        var next_txt = samples['data'][current_index]['txt'];
+        wavesurfer.load("/static/" + next_wav);
+        $("#transcription-text").html(next_txt);
+        wavesurfer.on('ready', function () {
+            wavesurfer.play();
+        });
+    }
+});
+
+$("#btn_correct").click(function(){
+    var wav = samples['data'][current_index]['wav'];
+    var txt = samples['data'][current_index]['txt'];
+
+    $.post ({
+    url: "/annotate",
+    data: { wav: wav, txt: txt, "status" : "OK"},
+    dataType: "json",
+    success: function(){
+         $("#btn_forward").click();
+    }
+    });
+});
+
+$("#btn_incorrect").click(function(){
+    var wav = samples['data'][current_index]['wav'];
+    var txt = samples['data'][current_index]['txt'];
+
+    $.post ({
+    url: "/annotate",
+    data: { wav: wav, txt: txt, "status" : "NOT_OK"},
+    dataType: "json",
+    success: function(){
+         $("#btn_forward").click();
+    }
+    });
+});
+
+$( ".grid-item" ).click(function() {
+  var wav = $(this).data('wav');
+  var txt = $(this).data('txt');
+  current_index = $(this).data('index');
+  wavesurfer.load("/static/" + wav);
+  $("#transcription-text").html(txt);
+  wavesurfer.on('ready', function () {
+      wavesurfer.play();
+  });
+
+});
+
+</script>
+
+
+</body>
+</html>
