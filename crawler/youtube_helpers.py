@@ -281,50 +281,6 @@ def getsize(filename):
     return os.stat(filename).st_size
 
 
-def sanitize(src_dir):
-    for f in Path(src_dir).walkfiles("*"):
-        if f.ext not in [".mp4", ".vtt", ".json", ".xml"]:
-            print("Removing {} extension".format(f))
-            os.remove(str(f))
-        if f.basename().find(" ") != -1:
-            print("Removing {}. FOund space".format(f))
-            os.remove(str(f))
-            # else:
-            #    print("keep")
-    for f in Path(src_dir).walkfiles("*.info.json"):
-        fn = str(f)
-        video_file = fn.replace(".info.json", ".mp4")
-        if not os.path.exists(video_file):
-            print("Removing {}".format(video_file))
-            os.remove(str(f))
-        annotations_file = fn.replace(".info.json", ".annotations.xml")
-        if os.path.exists(annotations_file):
-            print("Removing {}".format(annotations_file))
-            os.remove(annotations_file)
-
-    for f in Path(src_dir).walkfiles("*.en.vtt"):
-        if str(f).find("YTgenerated") != -1:
-            continue
-        fn = str(f)
-        video_file = fn.replace(".en.vtt", ".mp4")
-        if not os.path.exists(video_file):
-            video_file_corrupt = fn.replace(".en.vtt", "")
-            if not os.path.exists(video_file_corrupt):
-                print("Removing {}".format(fn))
-                os.remove(fn)
-                annotations_file = fn.replace(".en.vtt", ".annotations.xml")
-                info_json_file = fn.replace(".en.vtt", ".info.json")
-                if os.path.exists(annotations_file):
-                    os.remove(annotations_file)
-                if os.path.exists(info_json_file):
-                    os.remove(info_json_file)
-                video_part_file = fn.replace(".en.vtt", ".part")
-                if os.path.exists(video_part_file):
-                    os.remove(video_part_file)
-            else:
-                print("corrupt file exists {}".format(video_file_corrupt))
-
-
 def _load_annotations(ann_f):
     if os.path.exists(ann_f):
         with open(ann_f) as f:
@@ -333,44 +289,6 @@ def _load_annotations(ann_f):
             # print("title")
     else:
         print("{} does not exists".format(ann_f))
-
-
-def dl_generated_subs(url, ):
-    temp_dir = tempfile.mkdtemp(suffix="youtube")
-    command = "/informatik2/wtm/home/lakomkin/anaconda3/bin/youtube-dl --restrict-filenames --write-auto-sub " \
-              "--skip-download  " \
-              "{} -o \"{}/YTgenerated___%(id)s%(title)s\" >/dev/null 2>&1".format(url, target_dir)
-    os.system(command)
-    if not os.path.exists(generated_file):
-        return None
-    else:
-        return generated_file
-
-
-def download_all_automatic_captions(src_dir):
-    all_files = list(Path(src_dir).walkfiles("*.json"))
-    for orig_file in tqdm(all_files):
-        with open(str(orig_file)) as f:
-            res = json.load(f)
-            youtube_link = res['webpage_url']
-            yt_filename = res["_filename"].replace(".{}".format(res["ext"]), ".en.vtt")
-            file_path, fname = os.path.dirname(yt_filename), os.path.basename(yt_filename)
-
-            yt_filename = os.path.join(file_path, YT_PREFIX + fname)
-            # print(yt_filename)
-            # if not os.path.exists(yt_filename):
-            dl_generated_subs(youtube_link, os.path.abspath(orig_file.dirname()), yt_filename)
-            # else:
-            #    print("Found")
-
-
-def get_automatic_caption(subtitle_file):
-    subtitle_basename = os.path.basename(subtitle_file)
-    sub_dir_name = sub_file.dirname()
-    potential_yt_generated_f = os.path.join(sub_dir_name, "{}{}".format(YT_PREFIX, subtitle_basename))
-    if os.path.exists(potential_yt_generated_f):
-        return potential_yt_generated_f
-    return None
 
 
 def get_closest_captions(src_caption, lst_dest_captions):
