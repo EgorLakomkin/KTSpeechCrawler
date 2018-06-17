@@ -8,12 +8,11 @@ import json
 from tqdm import tqdm
 from scipy.io.wavfile import read
 import numpy as np
-from flask import request
 import json
 
 app = Flask(__name__)
 MIN_SUM_AMPLITUTDE = 1e-2
-ANNOTATIONS_FILE = "annotations.json"
+#ANNOTATIONS_FILE = "annotations.json"
 
 def select_random_sample(all_files):
     while True:
@@ -33,10 +32,10 @@ def select_random_sample(all_files):
 
 @app.route("/annotate", methods=['POST'])
 def annotate():
-    with open(ANNOTATIONS_FILE, 'a+') as f:
-        f.write(json.dumps(data) + "\n")
-        f.flush()
-        return jsonify({"result" : "OK"})
+    #with open(ANNOTATIONS_FILE, 'a+') as f:
+    #    f.write(json.dumps(data) + "\n")
+    #    f.flush()
+    return jsonify({"result" : "OK"})
 
 @app.route('/',methods=['GET'])
 def render_random():
