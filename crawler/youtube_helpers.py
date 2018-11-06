@@ -18,7 +18,7 @@ import speech_recognition as sr
 from Levenshtein import *
 from tqdm import tqdm
 
-everything_cool = re.compile(r"^[A-Za-z\,\.\-\?\"\'\’\!\“\s\;\:\“\”\–\‘\’\’\/\\]+$", re.IGNORECASE)
+everything_cool = re.compile(r"^[A-Za-z0-9\,\.\-\?\"\'\’\!\“\s\;\:\“\”\–\‘\’\’\/\\]+$", re.IGNORECASE)
 leave_chars = re.compile(r"[^a-z\s\']", re.IGNORECASE)
 # numbers are ignored
 html_tags = re.compile(r'<.*?>')
@@ -67,24 +67,23 @@ def timedelta_dt(t1, t2):
     return dt2 - dt1
 
 
+#        video_file = get_video_file(subtitle_file)
+
 def load_all_subtitles(subtitle_file):
     subs = WebVTT().read(subtitle_file).captions  # pysrt.open(subtitle_file)
-
     res = []
-    for s in subs:
+    for s_idx, s in enumerate(subs):
         start_ts = parse_ts(s.start).time()
         end_ts = parse_ts(s.end).time()
         phrase = s.text
         phrase = phrase.replace('\n', ' ')
-        video_file = get_video_file(subtitle_file)
-        assert os.path.exists(video_file), "{} video file does not exists".format(video_file)
         delta = timedelta_dt(start_ts, end_ts)
         res.append(
             {"ts_start": start_ts, "ts_end": end_ts,
              "original_phrase": phrase,
              "sub_file": subtitle_file,
-             "video_file": video_file,
-             "duration": delta.total_seconds(), }
+             "duration": delta.total_seconds(),
+             "idx" : s_idx}
         )
     return res
 
@@ -101,10 +100,10 @@ def get_video_file(subtitle_file):
             shutil.move(dumb_youtube_file, naive_video_file)
             return naive_video_file
         else:
-            raise Exception("naive video file does not exists {}".format(dumb_youtube_file))
+            raise Exception("Video file does not exists {}".format(dumb_youtube_file))
 
 
-def merge_subtiles(subs, min_dist=1.5, max_dist=6.0):
+def merge_subtitles(subs, min_dist=1.5, max_dist=6.0):
     res = []
     for s_idx in range(len(subs)):
         s = subs[s_idx]
@@ -120,7 +119,6 @@ def merge_subtiles(subs, min_dist=1.5, max_dist=6.0):
                 # merge
                 new_s = copy.deepcopy(prev_s)
                 new_s["ts_end"] = s["ts_end"]
-                new_s["phrase"] = prev_s["phrase"] + " " + s["phrase"]
                 new_s["original_phrase"] = prev_s["original_phrase"] + " " + s["original_phrase"]
                 new_delta = timedelta_dt(new_s["ts_start"], new_s["ts_end"])
                 new_s["duration"] = new_delta.total_seconds()
@@ -229,7 +227,7 @@ def normalize_subtitle(input_str):
     return input_str.strip()
 
 
-def convert_str(input_string):
+def leave_alphanum_characters(input_string):
     input_string = re.sub(leave_chars, ' ', input_string.lower())
     input_string = re.sub('\s+', ' ', input_string)
     input_string = input_string.upper()
@@ -256,10 +254,10 @@ def parse_subtitle(subtitle_file, max_duration=15, min_duration=3, min_threshold
     all_subtitles = [s for s in all_subtitles if re.match(everything_cool, s["phrase"])
                      and len(s["phrase"].strip()) >= min_transcript_len]
     for s in all_subtitles:
-        s["phrase"] = convert_str(s["phrase"])
+        s["phrase"] = leave_alphanum_characters(s["phrase"])
     print("{} after filtering".format(len(all_subtitles)))
 
-    all_subtitles = merge_subtiles(all_subtitles, min_dist=1.0, max_dist=max_duration)
+    all_subtitles = merge_subtitles(all_subtitles, min_dist=1.0, max_dist=max_duration)
     print("{} merged".format(len(all_subtitles)))
     # all_subtitles = filter_too_close_subtitles(all_subtitles, min_threshold=min_threshold)
     all_subtitles = list(filter(lambda x: x["duration"] <= max_duration
@@ -302,53 +300,7 @@ def get_closest_captions(src_caption, lst_dest_captions):
     return res
 
 
-def if_match_subtitles(caption_file, autogen_file, threshold=0.7, min_matches=5, min_char_length=150):
-    captions = WebVTT().read(caption_file).captions  # pysrt.open(caption_file)
-    # with open(autogen_file) as f:
-    #    content = f.read().strip()
-    #    true = "WEBVTT\nKind: captions\nLanguage: en\n"
-    #    autogen_captions = pysrt.from_string(content)
-    #    if len(autogen_captions) == 0:
-    #        content = content.replace("WEBVTT\n", true)
-    #        autogen_captions = pysrt.from_string(content)
-    autogen_captions = WebVTT().read(
-        autogen_file).captions  # WebVTT().read(autogen_file).captions #pysrt.open(autogen_file)
-    # for c in captions:
-    #    c.start_in_seconds = c.start.ordinal
-    #    c.end_in_seconds = c.end.ordinal
-
-
-    caption_text = " ".join([preprocess_phrase(c.text).lower().strip() for c in captions]).strip()
-    autgen_text = " ".join([preprocess_phrase(c.text).lower().strip() for c in autogen_captions]).strip()
-
-    if len(caption_text) < min_char_length or len(autgen_text) < min_char_length:
-        return False
-
-    ratio_similarity = ratio(caption_text, autgen_text)
-    print(ratio_similarity)
-    if ratio_similarity > 0.98 or ratio_similarity < threshold:
-        return False
-    return True
-    # for caption in captions:
-    #    if len(caption.text.strip()) < 10:
-    #        continue
-    #    caption.text = preprocess_phrase(caption.text)
-    #    closest_captions = get_closest_captions(caption, autogen_captions)
-
-    #    for c in closest_captions:
-    #        if ratio(caption.text.lower(), preprocess_phrase(c.text).lower()) > threshold:
-    #            num_good_matches += 1
-    #    if num_good_matches >= min_matches:
-    #        return True
-
-    # return num_good_matches >= min_matches
-
-
-def _prepare_phrase(phrase):
-    return phrase.strip().upper()
-
-
-def _get_transcript(t):
+def _get_transcript_google_web_asr(t):
     import tempfile
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav") as f:
@@ -370,7 +322,7 @@ def google_speech_test(timings, threshold=0.65, samples=2, min_duration=2.5):
         return False
     subset = random.sample(timings, samples)
 
-    transcripts = [(s, _get_transcript(s)) for s in subset]
+    transcripts = [(s, _get_transcript_google_web_asr(s)) for s in subset]
     transcripts = [(t, s) for (t, s) in transcripts if s is not None]
 
     if len(transcripts) == 0:

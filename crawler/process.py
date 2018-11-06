@@ -1,17 +1,34 @@
+# -*- coding: utf-8 -*-
 import sys
 import os
 import json
 import io
 import termcolor
+import re
 from tqdm import tqdm
-
-from crawler.youtube_helpers import parse_subtitle, google_speech_test, _prepare_phrase, getsize
+from crawler.youtube_helpers import get_hash, getsize
 from crawler.utils import extract_audio_part_segment
+from crawler.filters import Pipeline, OverlappingSubtitlesRemover, SubtitleCaptionTextFilter, SubtitleMerger,\
+    CaptionLengthFilter, CaptionRegexMatcher, CaptionDurationFilter, CaptionLeaveOnlyAlphaNumCharacters, CaptionNormalizer
+from crawler.youtube_helpers import load_all_subtitles
 
 
 class RESULT:
     GOOGLE_TEST_NOT_PASSED = 0
     OK = 1
+
+
+good_chars_regexp = re.compile(r"^[A-Za-z0-9\,\.\-\?\"\'\’\!\“\s\;\:\“\”\–\‘\’\’\/\\]+$", re.IGNORECASE)
+pipeline = Pipeline([
+    OverlappingSubtitlesRemover(),
+    SubtitleCaptionTextFilter(),
+    CaptionNormalizer(),
+    CaptionRegexMatcher(good_chars_regexp),
+    CaptionLengthFilter(min_length=5),
+    CaptionLeaveOnlyAlphaNumCharacters(),
+    SubtitleMerger(max_len_merged_sec=10),
+    CaptionDurationFilter(min_length=1, max_length=20.0)
+])
 
 
 if __name__ == "__main__":
@@ -34,22 +51,22 @@ if __name__ == "__main__":
             metadata = json.load(f)
         #youtube_link = metadata['webpage_url']
         print("Parsing subtitle")
-        subtitles = parse_subtitle(subtitle_file, min_duration=1, max_duration=10, min_threshold=1.5)
-        #min number of words
-        subtitles = [s for s in subtitles if len(s["phrase"].strip().split()) >= 3]
-
+        subtitles = load_all_subtitles(subtitle_file)
+        print(len(subtitles))
+        input = {
+            'subtitles': subtitles,
+            'video_file': video_file
+        }
         overall_info["num_subtitles"] = len(subtitles)
-
         termcolor.cprint("Got {} candidates".format(len(subtitles)), color="yellow")
-        subtitles = [s for s in subtitles if len(s["phrase"].strip()) > 0]
-        if not google_speech_test(subtitles, threshold=0.7, samples= 3, min_duration=1):
-            result = RESULT.GOOGLE_TEST_NOT_PASSED
-            raise Exception("Did not pass google speech test")
 
 
-        termcolor.cprint("Writing {} samples".format(len(subtitles)), color="cyan")
-        for t in tqdm(subtitles):
-            hash = t["hash"]
+        filtered_input = pipeline(input)
+        filtered_subtitles = filtered_input["subtitles"]
+
+        termcolor.cprint("Writing {} samples".format(len(filtered_subtitles)), color="cyan")
+        for t in tqdm(filtered_subtitles):
+            hash = get_hash(subtitle_file + t["original_phrase"] + str(t["ts_start"]))
             wav_file_dir = os.path.join(target_dir, "wav", hash[:2])
             txt_file_dir = os.path.join(target_dir, "txt", hash[:2])
             metadata_dir = os.path.join(target_dir, "metadata", hash[:2])
@@ -62,11 +79,11 @@ if __name__ == "__main__":
             target_txt_file = os.path.join(txt_file_dir, hash + ".txt")
             target_metadata_file = os.path.join(metadata_dir, hash + ".json")
 
-            text = _prepare_phrase(t["phrase"])
+            text = t["original_phrase"]
             if len(text) == 0:
                 continue
             if not os.path.exists(target_wav_file) or not os.path.exists(target_txt_file):
-                extract_audio_part_segment(t["video_file"], t["ts_start"], t["ts_end"], target_wav_file)
+                extract_audio_part_segment(video_file, t["ts_start"], t["ts_end"], target_wav_file)
 
                 with io.open(target_txt_file, "w", encoding='utf-8') as f:
                     f.write(text)
@@ -86,9 +103,8 @@ if __name__ == "__main__":
         log_file.write(json.dumps(overall_info) + "\n")
         log_file.flush()
         log_file.close()
-        if True:
-            if os.path.exists(video_file):
-                os.remove(video_file)
+        #if os.path.exists(video_file):
+        #    os.remove(video_file)
             #if os.path.exists(subtitle_file):
             #    os.remove(subtitle_file)
             #if os.path.exists(info_file):
