@@ -1,3 +1,7 @@
 termcolor
 webvtt-py
 path.py
+flask
+youtube-dl
+python-Levenshtein
+SpeechRecognition 
