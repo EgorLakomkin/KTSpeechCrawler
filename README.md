@@ -1,22 +1,19 @@
-# (to be updated with-in next couple of days)
 # KT-Speech-Crawler: Automatic Dataset Construction for Speech Recognition from YouTube Videos
 
-## Web demo
-http://emnlp-demo.lakomkin.me/
+## Google Colab
+https://colab.research.google.com/drive/1JVKzB9N2FIcxlib1kXuGlfeIuudkM9Vr
 
 
 ## Installation
 ```
 git clone https://github.com/EgorLakomkin/KTSpeechCrawler
-pip install webvtt-py SpeechRecognition path.py flask python-Levenshtein tqdm unicodedata
+pip install -r requirements.txt
 ```
-
-## Docker
-TODO:
 
 ## Running crawler
 ```
-sh ./crawler/en_corpus.sh <dir_with_intermediate_results> <dir_for_resulting_samples>
+chmod a+x ./crawler/en_corpus.sh
+./crawler/en_corpus.sh <dir_with_intermediate_results> <dir_for_resulting_samples>
 ```
 ## Browsing samples
 ```
