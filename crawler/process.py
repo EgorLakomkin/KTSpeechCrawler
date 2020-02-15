@@ -35,8 +35,10 @@ if __name__ == "__main__":
     video_file = sys.argv[1]
     target_dir = sys.argv[2]
 
-    subtitle_file = video_file.replace('.mp4', '.en.vtt')
-    info_file = video_file.replace('.mp4', '.info.json')
+    ext = "m4a"
+
+    subtitle_file = video_file.replace(f'.{ext}', '.en.vtt')
+    info_file = video_file.replace(f'.{ext}', '.info.json')
     overall_info = {"sub_file" : subtitle_file, "info" : info_file}
     log_file = open("./log.json", "a+")
 
